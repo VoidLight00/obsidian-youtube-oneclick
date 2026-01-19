@@ -1,10 +1,1 @@
-{
-  "id": "obsidian-youtube-oneclick",
-  "name": "YouTube OneClick Timestamp",
-  "version": "1.0.0",
-  "minAppVersion": "0.15.0",
-  "description": "Click timestamp links to jump directly to that point in embedded YouTube videos. No context menu needed.",
-  "author": "voidlight",
-  "authorUrl": "https://github.com/voidlight",
-  "isDesktopOnly": false
-}
+{"id":"obsidian-youtube-oneclick","name":"YouTube OneClick Timestamp","version":"1.0.0","minAppVersion":"0.15.0","description":"Click timestamp links to jump directly to that point in embedded YouTube videos. No context menu needed.","author":"voidlight","authorUrl":"https://github.com/voidlight","isDesktopOnly":false}

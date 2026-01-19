@@ -1,6 +1,6 @@
 import { App, MarkdownView, Notice, Plugin, PluginSettingTab, Setting } from 'obsidian';
-import { isTimestampLink, extractTimestamp, formatSeconds } from './src/utils/timestampParser';
-import { findYouTubeIframe, seekTo, playVideo, pauseVideo, ensureJsApiEnabled } from './src/utils/youtubeController';
+import { isTimestampLink, extractTimestamp } from './src/utils/timestampParser';
+import { findYouTubeIframe, seekTo, playVideo, ensureJsApiEnabled } from './src/utils/youtubeController';
 
 interface YouTubeOneClickSettings {
   showSuccessNotice: boolean;
@@ -8,7 +8,7 @@ interface YouTubeOneClickSettings {
 }
 
 const DEFAULT_SETTINGS: YouTubeOneClickSettings = {
-  showSuccessNotice: false,
+  showSuccessNotice: true,
   autoPlay: true
 };
 
@@ -18,7 +18,7 @@ export default class YouTubeOneClickPlugin extends Plugin {
   async onload() {
     await this.loadSettings();
 
-    this.registerDomEvent(document, 'click', this.handleClick.bind(this));
+    this.registerDomEvent(document, 'click', this.handleClick.bind(this), true);
 
     this.addCommand({
       id: 'youtube-play-pause',
@@ -39,9 +39,13 @@ export default class YouTubeOneClickPlugin extends Plugin {
     });
 
     this.addSettingTab(new YouTubeOneClickSettingTab(this.app, this));
+    
+    console.log('YouTube OneClick Timestamp loaded');
   }
 
-  onunload() {}
+  onunload() {
+    console.log('YouTube OneClick Timestamp unloaded');
+  }
 
   async loadSettings() {
     this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
@@ -54,18 +58,22 @@ export default class YouTubeOneClickPlugin extends Plugin {
   private handleClick(evt: MouseEvent) {
     const target = evt.target as HTMLElement;
     
-    if (!target.matches('a.internal-link, a.cm-underline')) {
+    const link = target.closest('a');
+    if (!link) {
       return;
     }
 
-    const linkText = target.textContent;
+    const linkText = link.textContent;
     
     if (!isTimestampLink(linkText)) {
       return;
     }
 
+    console.log('YouTube OneClick: Timestamp link clicked:', linkText);
+
     evt.preventDefault();
     evt.stopPropagation();
+    evt.stopImmediatePropagation();
 
     const timestamp = extractTimestamp(linkText || '');
     
@@ -94,11 +102,11 @@ export default class YouTubeOneClickPlugin extends Plugin {
     
     if (result.success) {
       if (this.settings.autoPlay) {
-        playVideo(iframe);
+        setTimeout(() => playVideo(iframe), 100);
       }
       
       if (this.settings.showSuccessNotice) {
-        new Notice(`Jumped to ${timestamp.formatted}`);
+        new Notice(`▶️ ${timestamp.formatted}`);
       }
     } else {
       new Notice(result.message);
@@ -128,7 +136,7 @@ export default class YouTubeOneClickPlugin extends Plugin {
       return;
     }
 
-    new Notice(`Seek ${deltaSeconds > 0 ? '+' : ''}${deltaSeconds}s (requires video to be playing)`);
+    new Notice(`Seek ${deltaSeconds > 0 ? '+' : ''}${deltaSeconds}s`);
   }
 }
 
