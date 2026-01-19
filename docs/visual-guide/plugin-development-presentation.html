@@ -1,0 +1,1436 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube OneClick Timestamp Plugin | 개발 가이드</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700;800;900&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+        :root {
+            --black: #0a0a0a;
+            --white: #ffffff;
+            --gray-50: #fafafa;
+            --gray-100: #f4f4f5;
+            --gray-200: #e4e4e7;
+            --gray-300: #d4d4d8;
+            --gray-400: #a1a1aa;
+            --gray-500: #71717a;
+            --gray-600: #52525b;
+            --gray-700: #3f3f46;
+            --gray-800: #27272a;
+            --gray-900: #18181b;
+            
+            --youtube: #FF0000;
+            --youtube-light: #FEE2E2;
+            --obsidian: #7C3AED;
+            --obsidian-light: #EDE9FE;
+            --obsidian-dark: #5B21B6;
+            --typescript: #3178C6;
+            --typescript-light: #DBEAFE;
+            --success: #10B981;
+            --warning: #F59E0B;
+            --danger: #EF4444;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html { font-size: 16px; }
+
+        body {
+            font-family: 'Noto Sans KR', 'Inter', system-ui, sans-serif;
+            background: var(--white);
+            color: var(--black);
+            overflow: hidden;
+            height: 100vh;
+            line-height: 1.5;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .progress {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--youtube), var(--obsidian));
+            z-index: 9999;
+            transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .slide-counter {
+            position: fixed;
+            top: 24px;
+            right: 32px;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--gray-400);
+            font-family: 'Inter', sans-serif;
+            z-index: 100;
+        }
+        .slide-counter span { color: var(--black); font-size: 18px; }
+
+        .watermark {
+            position: fixed;
+            bottom: 24px;
+            left: 32px;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            color: var(--gray-300);
+            z-index: 100;
+        }
+
+        .next-preview {
+            position: fixed;
+            bottom: 24px;
+            right: 32px;
+            text-align: right;
+            z-index: 100;
+            max-width: 200px;
+        }
+        .next-preview-label {
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--gray-400);
+            margin-bottom: 4px;
+        }
+        .next-preview-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--gray-600);
+            line-height: 1.4;
+        }
+
+        .slide {
+            position: absolute;
+            inset: 0;
+            display: none;
+            padding: 48px 64px;
+            opacity: 0;
+        }
+
+        .slide.active {
+            display: flex;
+            flex-direction: column;
+            opacity: 1;
+            animation: fadeIn 0.4s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(12px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .slide-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            margin-bottom: 32px;
+        }
+
+        .slide-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            border-radius: 4px;
+        }
+        .slide-tag.obsidian { background: var(--obsidian); color: white; }
+        .slide-tag.youtube { background: var(--youtube); color: white; }
+        .slide-tag.typescript { background: var(--typescript); color: white; }
+        .slide-tag.dark { background: var(--black); color: white; }
+
+        .slide-title {
+            font-size: 32px;
+            font-weight: 800;
+            line-height: 1.2;
+            letter-spacing: -0.02em;
+            color: var(--black);
+        }
+
+        .slide-subtitle {
+            font-size: 16px;
+            font-weight: 400;
+            color: var(--gray-500);
+            margin-top: 8px;
+        }
+
+        .slide-body { flex: 1; display: flex; flex-direction: column; }
+
+        .h1 { font-size: 48px; font-weight: 900; line-height: 1.1; letter-spacing: -0.03em; }
+        .h2 { font-size: 36px; font-weight: 800; line-height: 1.2; letter-spacing: -0.02em; }
+        .h3 { font-size: 24px; font-weight: 700; line-height: 1.3; }
+        .h4 { font-size: 18px; font-weight: 600; line-height: 1.4; }
+        .body { font-size: 15px; font-weight: 400; line-height: 1.6; }
+        .small { font-size: 13px; font-weight: 400; line-height: 1.5; }
+        .tiny { font-size: 11px; font-weight: 500; line-height: 1.4; }
+        .mono { font-family: 'JetBrains Mono', monospace; }
+
+        .text-obsidian { color: var(--obsidian); }
+        .text-youtube { color: var(--youtube); }
+        .text-typescript { color: var(--typescript); }
+        .text-gray { color: var(--gray-500); }
+        .text-success { color: var(--success); }
+        .text-danger { color: var(--danger); }
+
+        .grid { display: grid; gap: 24px; }
+        .grid-2 { grid-template-columns: repeat(2, 1fr); }
+        .grid-3 { grid-template-columns: repeat(3, 1fr); }
+        .grid-4 { grid-template-columns: repeat(4, 1fr); }
+        .grid-5 { grid-template-columns: repeat(5, 1fr); }
+
+        .flex { display: flex; }
+        .flex-col { flex-direction: column; }
+        .items-center { align-items: center; }
+        .items-start { align-items: flex-start; }
+        .justify-center { justify-content: center; }
+        .justify-between { justify-content: space-between; }
+        .gap-8 { gap: 8px; }
+        .gap-12 { gap: 12px; }
+        .gap-16 { gap: 16px; }
+        .gap-24 { gap: 24px; }
+        .gap-32 { gap: 32px; }
+        .gap-48 { gap: 48px; }
+
+        .mt-4 { margin-top: 4px; }
+        .mt-8 { margin-top: 8px; }
+        .mt-12 { margin-top: 12px; }
+        .mt-16 { margin-top: 16px; }
+        .mt-24 { margin-top: 24px; }
+        .mt-32 { margin-top: 32px; }
+        .mt-auto { margin-top: auto; }
+        .mb-8 { margin-bottom: 8px; }
+        .mb-12 { margin-bottom: 12px; }
+        .mb-16 { margin-bottom: 16px; }
+        .mb-24 { margin-bottom: 24px; }
+
+        .card {
+            background: var(--white);
+            border: 2px solid var(--gray-200);
+            border-radius: 12px;
+            padding: 24px;
+            transition: all 0.2s ease;
+        }
+        .card:hover {
+            border-color: var(--gray-300);
+            box-shadow: 0 8px 24px -8px rgba(0,0,0,0.1);
+        }
+
+        .card-dark {
+            background: var(--gray-900);
+            border: none;
+            border-radius: 12px;
+            padding: 24px;
+            color: white;
+        }
+
+        .card-obsidian {
+            background: var(--obsidian-light);
+            border: 2px solid var(--obsidian);
+            border-radius: 12px;
+            padding: 24px;
+        }
+
+        .card-youtube {
+            background: var(--youtube-light);
+            border: 2px solid var(--youtube);
+            border-radius: 12px;
+            padding: 24px;
+        }
+
+        .card-typescript {
+            background: var(--typescript-light);
+            border: 2px solid var(--typescript);
+            border-radius: 12px;
+            padding: 24px;
+        }
+
+        .stat {
+            font-family: 'Inter', sans-serif;
+            font-size: 56px;
+            font-weight: 900;
+            line-height: 1;
+            letter-spacing: -0.03em;
+        }
+
+        .stat-md {
+            font-family: 'Inter', sans-serif;
+            font-size: 40px;
+            font-weight: 900;
+            line-height: 1;
+        }
+
+        .stat-sm {
+            font-family: 'Inter', sans-serif;
+            font-size: 28px;
+            font-weight: 800;
+            line-height: 1;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--gray-500);
+            margin-top: 4px;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 10px;
+            font-size: 11px;
+            font-weight: 700;
+            border-radius: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .badge-black { background: var(--black); color: white; }
+        .badge-obsidian { background: var(--obsidian); color: white; }
+        .badge-youtube { background: var(--youtube); color: white; }
+        .badge-typescript { background: var(--typescript); color: white; }
+        .badge-outline { background: white; border: 2px solid var(--gray-300); color: var(--gray-600); }
+        .badge-success { background: var(--success); color: white; }
+        .badge-danger { background: #FEE2E2; color: var(--danger); }
+        .badge-warning { background: #FEF3C7; color: #B45309; }
+
+        .icon {
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 10px;
+            font-weight: 800;
+            font-size: 16px;
+            flex-shrink: 0;
+        }
+        .icon-sm { width: 32px; height: 32px; border-radius: 8px; font-size: 14px; }
+        .icon-lg { width: 56px; height: 56px; border-radius: 14px; font-size: 22px; }
+        .icon-black { background: var(--black); color: white; }
+        .icon-obsidian { background: var(--obsidian); color: white; }
+        .icon-youtube { background: var(--youtube); color: white; }
+        .icon-typescript { background: var(--typescript); color: white; }
+        .icon-outline { background: white; border: 2px solid var(--gray-300); color: var(--gray-600); }
+
+        .code-block {
+            background: var(--gray-900);
+            color: var(--gray-100);
+            padding: 16px 20px;
+            border-radius: 8px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            line-height: 1.7;
+            overflow-x: auto;
+        }
+        .code-block .comment { color: var(--gray-500); }
+        .code-block .keyword { color: #F472B6; }
+        .code-block .string { color: #34D399; }
+        .code-block .function { color: #A78BFA; }
+        .code-block .number { color: #FBBF24; }
+
+        .timeline {
+            position: relative;
+            padding-left: 32px;
+        }
+        .timeline::before {
+            content: '';
+            position: absolute;
+            left: 11px;
+            top: 8px;
+            bottom: 8px;
+            width: 2px;
+            background: linear-gradient(180deg, var(--youtube), var(--obsidian), var(--typescript));
+            border-radius: 1px;
+        }
+        .timeline-item {
+            position: relative;
+            padding-bottom: 20px;
+        }
+        .timeline-item:last-child { padding-bottom: 0; }
+        .timeline-dot {
+            position: absolute;
+            left: -32px;
+            top: 4px;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: var(--obsidian);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            font-weight: 700;
+        }
+
+        .nav-dots {
+            position: fixed;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 6px;
+            z-index: 100;
+        }
+        .nav-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 3px;
+            background: var(--gray-300);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .nav-dot:hover { background: var(--gray-400); }
+        .nav-dot.active {
+            width: 24px;
+            background: var(--obsidian);
+        }
+
+        .cover-layout {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            height: 100%;
+        }
+
+        .part-layout {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            justify-content: center;
+            height: 100%;
+            background: var(--gray-900);
+            margin: -48px -64px;
+            padding: 48px 64px;
+            color: white;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .part-bg-number {
+            position: absolute;
+            right: 64px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 280px;
+            font-weight: 900;
+            color: rgba(255,255,255,0.03);
+            font-family: 'Inter', sans-serif;
+            line-height: 1;
+        }
+
+        .quote {
+            font-size: 20px;
+            font-weight: 600;
+            font-style: italic;
+            color: var(--gray-700);
+            padding-left: 20px;
+            border-left: 4px solid var(--obsidian);
+        }
+
+        .flow-step {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 16px;
+            background: var(--gray-50);
+            border-radius: 12px;
+            border: 2px solid var(--gray-200);
+        }
+        .flow-step-number {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            font-weight: 800;
+            flex-shrink: 0;
+        }
+        .flow-arrow {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--gray-400);
+            font-size: 24px;
+        }
+
+        .adhd-card {
+            background: linear-gradient(135deg, var(--obsidian-light), var(--typescript-light));
+            border: 2px solid var(--obsidian);
+            border-radius: 12px;
+            padding: 20px;
+        }
+        .adhd-step {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 12px 16px;
+            background: white;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            border: 1px solid var(--gray-200);
+        }
+        .adhd-step:last-child { margin-bottom: 0; }
+        .adhd-number {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: var(--obsidian);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 14px;
+            flex-shrink: 0;
+        }
+        .adhd-time {
+            margin-left: auto;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--warning);
+            background: #FEF3C7;
+            padding: 4px 8px;
+            border-radius: 4px;
+        }
+
+        @media (max-width: 1200px) {
+            .slide { padding: 32px 40px; }
+            .h1 { font-size: 36px; }
+            .grid-4 { grid-template-columns: repeat(2, 1fr); }
+            .grid-5 { grid-template-columns: repeat(3, 1fr); }
+        }
+    </style>
+</head>
+<body>
+
+<div class="progress" id="progress"></div>
+<div class="watermark">YouTube OneClick</div>
+<div class="slide-counter"><span id="currentSlide">01</span> / 12</div>
+<div class="next-preview" id="nextPreview">
+    <div class="next-preview-label">Next</div>
+    <div class="next-preview-title" id="nextTitle">플러그인 개요</div>
+</div>
+
+<div class="slide active" data-next="플러그인 개요">
+    <div class="cover-layout">
+        <svg width="600" height="300" viewBox="0 0 600 300" style="margin-bottom: 30px;">
+            <defs>
+                <linearGradient id="ytGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" style="stop-color:#FF0000"/>
+                    <stop offset="100%" style="stop-color:#CC0000"/>
+                </linearGradient>
+                <linearGradient id="obsGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" style="stop-color:#8B5CF6"/>
+                    <stop offset="100%" style="stop-color:#5B21B6"/>
+                </linearGradient>
+                <filter id="glow">
+                    <feGaussianBlur stdDeviation="4" result="blur"/>
+                    <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+                </filter>
+            </defs>
+            
+            <g transform="translate(150, 150)">
+                <rect x="-70" y="-50" width="140" height="100" rx="15" fill="url(#ytGrad)" filter="url(#glow)"/>
+                <polygon points="-20,-25 -20,25 30,0" fill="white"/>
+                <text x="0" y="80" text-anchor="middle" font-size="14" fill="#666" font-weight="600">YouTube iframe</text>
+            </g>
+            
+            <g transform="translate(300, 150)">
+                <path d="M-30,0 L30,0" stroke="#7C3AED" stroke-width="4" stroke-dasharray="8 4">
+                    <animate attributeName="stroke-dashoffset" from="24" to="0" dur="1s" repeatCount="indefinite"/>
+                </path>
+                <polygon points="25,-8 45,0 25,8" fill="#7C3AED"/>
+                <text x="0" y="-20" text-anchor="middle" font-size="11" fill="#7C3AED" font-weight="600">postMessage</text>
+            </g>
+            
+            <g transform="translate(450, 150)" filter="url(#glow)">
+                <polygon points="0,-60 52,-30 52,30 0,60 -52,30 -52,-30" fill="url(#obsGrad)"/>
+                <polygon points="0,-40 35,-20 35,20 0,40 -35,20 -35,-20" fill="#8B5CF6" opacity="0.7"/>
+                <polygon points="0,-20 18,-10 18,10 0,20 -18,10 -18,-10" fill="#A78BFA" opacity="0.8"/>
+                <circle cx="0" cy="0" r="8" fill="white"/>
+                <text x="0" y="90" text-anchor="middle" font-size="14" fill="#666" font-weight="600">Obsidian Plugin</text>
+            </g>
+            
+            <g transform="translate(300, 80)">
+                <rect x="-60" y="-20" width="120" height="40" rx="20" fill="#EDE9FE" stroke="#7C3AED" stroke-width="2"/>
+                <text x="0" y="5" text-anchor="middle" font-size="13" fill="#5B21B6" font-weight="700">[play 1:23]()</text>
+            </g>
+        </svg>
+        
+        <h1 class="h1">
+            <span class="text-youtube">YouTube</span> <span class="text-obsidian">OneClick</span> Timestamp
+        </h1>
+        <h1 class="h1 mt-8" style="border-bottom: 4px solid var(--black); padding-bottom: 8px;">
+            플러그인 개발 가이드
+        </h1>
+        
+        <p class="body text-gray mt-24">클릭 한 번으로 YouTube 영상 타임스탬프 점프</p>
+        <p class="small text-gray mt-8">Obsidian Plugin Development with TypeScript</p>
+        
+        <div class="flex gap-16 mt-32">
+            <span class="badge badge-youtube">YouTube API</span>
+            <span class="badge badge-obsidian">Obsidian</span>
+            <span class="badge badge-typescript">TypeScript</span>
+        </div>
+    </div>
+</div>
+
+<div class="slide" data-next="5단계 동작 흐름">
+    <div class="slide-header">
+        <div>
+            <div class="slide-tag dark">Overview</div>
+            <h2 class="slide-title mt-12">플러그인 개요</h2>
+            <p class="slide-subtitle">기존 방식 vs 원클릭 방식</p>
+        </div>
+    </div>
+    
+    <div class="slide-body">
+        <div class="grid grid-2 gap-32">
+            <div class="card" style="border-top: 4px solid var(--gray-400);">
+                <div class="flex items-center gap-12 mb-16">
+                    <div class="icon icon-outline">X</div>
+                    <span class="badge badge-outline">기존 방식</span>
+                </div>
+                <h3 class="h4 text-gray">YouTube Iframe Timestamps</h3>
+                <div class="code-block mt-16">
+                    <span class="comment">// 기존: 우클릭 → 메뉴 선택 필요</span><br>
+                    [1:23 - 설명](https://youtu.be/xxx?t=83)
+                </div>
+                <div class="mt-16">
+                    <p class="small text-gray">1. 링크 위에서 우클릭</p>
+                    <p class="small text-gray">2. "Open Timestamp on Iframe" 선택</p>
+                    <p class="small text-gray">3. 영상 점프</p>
+                </div>
+                <div class="flex items-center gap-8 mt-16">
+                    <span class="badge badge-danger">3단계</span>
+                    <span class="small text-gray">번거로움</span>
+                </div>
+            </div>
+            
+            <div class="card-obsidian">
+                <div class="flex items-center gap-12 mb-16">
+                    <div class="icon icon-obsidian">✓</div>
+                    <span class="badge badge-obsidian">원클릭 방식</span>
+                </div>
+                <h3 class="h4">YouTube OneClick Timestamp</h3>
+                <div class="code-block mt-16">
+                    <span class="comment">// 새로운: 직접 클릭만!</span><br>
+                    [<span class="keyword">play</span> <span class="number">1:23</span>]()
+                </div>
+                <div class="mt-16">
+                    <p class="small"><strong>1. 클릭 → 끝!</strong></p>
+                </div>
+                <div class="flex items-center gap-8 mt-16">
+                    <span class="badge badge-success">1단계</span>
+                    <span class="small">직관적</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="grid grid-4 gap-16 mt-auto">
+            <div class="card" style="text-align: center; padding: 20px;">
+                <div class="stat-md text-obsidian">1h</div>
+                <div class="stat-label">개발 시간</div>
+            </div>
+            <div class="card" style="text-align: center; padding: 20px;">
+                <div class="stat-md text-typescript">~200</div>
+                <div class="stat-label">코드 라인</div>
+            </div>
+            <div class="card" style="text-align: center; padding: 20px;">
+                <div class="stat-md text-youtube">3</div>
+                <div class="stat-label">핵심 모듈</div>
+            </div>
+            <div class="card" style="text-align: center; padding: 20px;">
+                <div class="stat-md" style="color: var(--success);">5</div>
+                <div class="stat-label">동작 단계</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="slide" data-next="파인만 설명: 5살도 이해하기">
+    <div class="slide-header">
+        <div>
+            <div class="slide-tag obsidian">Core</div>
+            <h2 class="slide-title mt-12">5단계 동작 흐름</h2>
+            <p class="slide-subtitle">클릭부터 점프까지</p>
+        </div>
+    </div>
+    
+    <div class="slide-body">
+        <div class="flex gap-16 items-center justify-center" style="flex: 1;">
+            <div class="flow-step" style="flex: 1;">
+                <div class="flow-step-number" style="background: var(--gray-800); color: white;">1</div>
+                <div>
+                    <h4 class="h4">👆 클릭</h4>
+                    <p class="small text-gray mono">registerDomEvent</p>
+                </div>
+            </div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-step" style="flex: 1;">
+                <div class="flow-step-number" style="background: var(--obsidian); color: white;">2</div>
+                <div>
+                    <h4 class="h4">🔍 감지</h4>
+                    <p class="small text-gray mono">isTimestampLink()</p>
+                </div>
+            </div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-step" style="flex: 1;">
+                <div class="flow-step-number" style="background: var(--typescript); color: white;">3</div>
+                <div>
+                    <h4 class="h4">⏱️ 파싱</h4>
+                    <p class="small text-gray mono">extractTimestamp()</p>
+                </div>
+            </div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-step" style="flex: 1;">
+                <div class="flow-step-number" style="background: var(--youtube); color: white;">4</div>
+                <div>
+                    <h4 class="h4">📺 탐색</h4>
+                    <p class="small text-gray mono">findYouTubeIframe()</p>
+                </div>
+            </div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-step" style="flex: 1; background: var(--obsidian-light); border-color: var(--obsidian);">
+                <div class="flow-step-number" style="background: var(--success); color: white;">5</div>
+                <div>
+                    <h4 class="h4">⏭️ 점프!</h4>
+                    <p class="small text-gray mono">seekTo() + playVideo()</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="code-block mt-24">
+            <span class="comment">// 전체 흐름 요약</span><br>
+            <span class="keyword">const</span> link = target.<span class="function">closest</span>(<span class="string">'a'</span>);  <span class="comment">// 1. 클릭된 링크 찾기</span><br>
+            <span class="keyword">if</span> (<span class="function">isTimestampLink</span>(link.textContent)) {  <span class="comment">// 2. 타임스탬프 형식 확인</span><br>
+            &nbsp;&nbsp;<span class="keyword">const</span> ts = <span class="function">extractTimestamp</span>(link.textContent);  <span class="comment">// 3. "1:23" → 83초</span><br>
+            &nbsp;&nbsp;<span class="keyword">const</span> iframe = <span class="function">findYouTubeIframe</span>(container);  <span class="comment">// 4. iframe 찾기</span><br>
+            &nbsp;&nbsp;<span class="function">seekTo</span>(iframe, ts.seconds);  <span class="comment">// 5. 점프!</span><br>
+            }
+        </div>
+    </div>
+</div>
+
+<div class="slide" data-next="모듈 아키텍처">
+    <div class="slide-header">
+        <div>
+            <div class="slide-tag youtube">파인만 기법</div>
+            <h2 class="slide-title mt-12">5살도 이해하기</h2>
+            <p class="slide-subtitle">복잡한 것을 단순하게!</p>
+        </div>
+    </div>
+    
+    <div class="slide-body">
+        <div class="grid grid-3 gap-24">
+            <div class="card" style="border-left: 4px solid var(--gray-800);">
+                <div style="font-size: 48px; margin-bottom: 16px;">👀</div>
+                <h3 class="h4">지켜보기</h3>
+                <p class="small text-gray mt-8">플러그인은 항상 깨어있어요.<br>누가 뭘 클릭하는지 계속 봐요.</p>
+                <div class="code-block mt-16" style="font-size: 11px;">
+                    document.<span class="function">addEventListener</span>(<span class="string">'click'</span>)
+                </div>
+            </div>
+            
+            <div class="card" style="border-left: 4px solid var(--obsidian);">
+                <div style="font-size: 48px; margin-bottom: 16px;">🔍</div>
+                <h3 class="h4">확인하기</h3>
+                <p class="small text-gray mt-8">"이거 [play 1:23]() 형식이야?"<br>패턴을 확인해요.</p>
+                <div class="code-block mt-16" style="font-size: 11px;">
+                    /^play\s*\d+:\d+$/
+                </div>
+            </div>
+            
+            <div class="card" style="border-left: 4px solid var(--danger);">
+                <div style="font-size: 48px; margin-bottom: 16px;">🛑</div>
+                <h3 class="h4">막기</h3>
+                <p class="small text-gray mt-8">"잠깐! 새 노트 만들지 마!"<br>기본 동작을 멈춰요.</p>
+                <div class="code-block mt-16" style="font-size: 11px;">
+                    evt.<span class="function">preventDefault</span>()
+                </div>
+            </div>
+            
+            <div class="card" style="border-left: 4px solid var(--youtube);">
+                <div style="font-size: 48px; margin-bottom: 16px;">📺</div>
+                <h3 class="h4">찾기</h3>
+                <p class="small text-gray mt-8">"이 노트에 유튜브 있어?"<br>iframe을 찾아요.</p>
+                <div class="code-block mt-16" style="font-size: 11px;">
+                    container.<span class="function">querySelector</span>(<span class="string">'iframe'</span>)
+                </div>
+            </div>
+            
+            <div class="card" style="border-left: 4px solid var(--success);">
+                <div style="font-size: 48px; margin-bottom: 16px;">⏭️</div>
+                <h3 class="h4">점프!</h3>
+                <p class="small text-gray mt-8">"영상아, 83초로 가!"<br>postMessage로 명령해요.</p>
+                <div class="code-block mt-16" style="font-size: 11px;">
+                    iframe.<span class="function">postMessage</span>({seekTo})
+                </div>
+            </div>
+            
+            <div class="card-dark">
+                <div style="font-size: 48px; margin-bottom: 16px;">📬</div>
+                <h3 class="h4" style="color: white;">postMessage란?</h3>
+                <p class="small mt-8" style="color: var(--gray-400);">YouTube는 다른 "나라"예요.<br>직접 접근 못해요 (보안!)<br><br>postMessage는 <strong style="color: white;">외교 채널</strong>이에요!</p>
+            </div>
+        </div>
+        
+        <div class="quote mt-auto">"복잡한 개념도 6살에게 설명할 수 없다면, 당신도 이해하지 못한 것이다" - 파인만</div>
+    </div>
+</div>
+
+<div class="slide" data-next="타임스탬프 파서">
+    <div class="slide-header">
+        <div>
+            <div class="slide-tag typescript">Architecture</div>
+            <h2 class="slide-title mt-12">모듈 아키텍처</h2>
+            <p class="slide-subtitle">단일 책임 원칙 (Single Responsibility)</p>
+        </div>
+    </div>
+    
+    <div class="slide-body">
+        <div class="flex gap-48 items-start" style="flex: 1;">
+            <div style="flex: 1;">
+                <svg width="100%" height="320" viewBox="0 0 400 320">
+                    <defs>
+                        <linearGradient id="mainGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" style="stop-color:#7C3AED"/>
+                            <stop offset="100%" style="stop-color:#5B21B6"/>
+                        </linearGradient>
+                    </defs>
+                    
+                    <rect x="100" y="20" width="200" height="60" rx="12" fill="url(#mainGrad)"/>
+                    <text x="200" y="55" text-anchor="middle" font-size="16" fill="white" font-weight="700">main.ts</text>
+                    <text x="200" y="10" text-anchor="middle" font-size="10" fill="#666">🎼 지휘자</text>
+                    
+                    <line x1="200" y1="80" x2="120" y2="140" stroke="#d4d4d8" stroke-width="2" stroke-dasharray="6 3"/>
+                    <line x1="200" y1="80" x2="280" y2="140" stroke="#d4d4d8" stroke-width="2" stroke-dasharray="6 3"/>
+                    
+                    <rect x="20" y="140" width="180" height="60" rx="12" fill="#10B981" opacity="0.9"/>
+                    <text x="110" y="175" text-anchor="middle" font-size="13" fill="white" font-weight="600">timestampParser.ts</text>
+                    <text x="110" y="130" text-anchor="middle" font-size="10" fill="#666">🕐 통역사</text>
+                    
+                    <rect x="200" y="140" width="180" height="60" rx="12" fill="#3178C6" opacity="0.9"/>
+                    <text x="290" y="175" text-anchor="middle" font-size="13" fill="white" font-weight="600">youtubeController.ts</text>
+                    <text x="290" y="130" text-anchor="middle" font-size="10" fill="#666">🎮 리모컨</text>
+                    
+                    <g transform="translate(20, 220)">
+                        <text x="0" y="15" font-size="11" fill="#666">• isTimestampLink()</text>
+                        <text x="0" y="35" font-size="11" fill="#666">• extractTimestamp()</text>
+                        <text x="0" y="55" font-size="11" fill="#666">• parseTimeString()</text>
+                    </g>
+                    
+                    <g transform="translate(200, 220)">
+                        <text x="0" y="15" font-size="11" fill="#666">• findYouTubeIframe()</text>
+                        <text x="0" y="35" font-size="11" fill="#666">• seekTo()</text>
+                        <text x="0" y="55" font-size="11" fill="#666">• playVideo()</text>
+                    </g>
+                </svg>
+            </div>
+            
+            <div style="flex: 1;">
+                <h3 class="h4 mb-16">왜 이렇게 나눴을까?</h3>
+                
+                <div class="card mb-16">
+                    <div class="flex items-center gap-12">
+                        <div class="icon icon-obsidian">1</div>
+                        <div>
+                            <h4 class="h4">main.ts</h4>
+                            <p class="small text-gray">전체 조율, 이벤트 등록</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card mb-16" style="border-color: var(--success);">
+                    <div class="flex items-center gap-12">
+                        <div class="icon" style="background: var(--success); color: white;">2</div>
+                        <div>
+                            <h4 class="h4">timestampParser.ts</h4>
+                            <p class="small text-gray">"play 1:23" → 83초 변환</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card" style="border-color: var(--typescript);">
+                    <div class="flex items-center gap-12">
+                        <div class="icon icon-typescript">3</div>
+                        <div>
+                            <h4 class="h4">youtubeController.ts</h4>
+                            <p class="small text-gray">iframe 찾기, 명령 전송</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card-dark mt-24">
+                    <p class="small" style="color: var(--gray-300);">
+                        <strong style="color: white;">장점:</strong> 각자 자기 일만 하면 됨!<br>
+                        → 수정/테스트/디버깅이 쉬워짐
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="slide" data-next="YouTube 컨트롤러">
+    <div class="slide-header">
+        <div>
+            <div class="slide-tag" style="background: var(--success); color: white;">Module 1</div>
+            <h2 class="slide-title mt-12">타임스탬프 파서</h2>
+            <p class="slide-subtitle">timestampParser.ts - "1:23" → 83초</p>
+        </div>
+    </div>
+    
+    <div class="slide-body">
+        <div class="grid grid-2 gap-32">
+            <div>
+                <h3 class="h4 mb-16">지원 형식</h3>
+                <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+                    <tr style="background: var(--gray-100);">
+                        <th style="padding: 12px; text-align: left; border-bottom: 2px solid var(--gray-200);">입력</th>
+                        <th style="padding: 12px; text-align: left; border-bottom: 2px solid var(--gray-200);">출력</th>
+                        <th style="padding: 12px; text-align: left; border-bottom: 2px solid var(--gray-200);">계산</th>
+                    </tr>
+                    <tr>
+                        <td style="padding: 12px; border-bottom: 1px solid var(--gray-200);"><code>play 0:00</code></td>
+                        <td style="padding: 12px; border-bottom: 1px solid var(--gray-200);"><strong>0</strong>초</td>
+                        <td style="padding: 12px; border-bottom: 1px solid var(--gray-200); color: var(--gray-500);">0×60 + 0</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 12px; border-bottom: 1px solid var(--gray-200);"><code>play 1:23</code></td>
+                        <td style="padding: 12px; border-bottom: 1px solid var(--gray-200);"><strong>83</strong>초</td>
+                        <td style="padding: 12px; border-bottom: 1px solid var(--gray-200); color: var(--gray-500);">1×60 + 23</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 12px; border-bottom: 1px solid var(--gray-200);"><code>play 12:34</code></td>
+                        <td style="padding: 12px; border-bottom: 1px solid var(--gray-200);"><strong>754</strong>초</td>
+                        <td style="padding: 12px; border-bottom: 1px solid var(--gray-200); color: var(--gray-500);">12×60 + 34</td>
+                    </tr>
+                    <tr style="background: var(--obsidian-light);">
+                        <td style="padding: 12px;"><code>play 1:23:45</code></td>
+                        <td style="padding: 12px;"><strong>5025</strong>초</td>
+                        <td style="padding: 12px; color: var(--obsidian);">1×3600 + 23×60 + 45</td>
+                    </tr>
+                </table>
+                
+                <div class="card mt-24">
+                    <h4 class="h4 mb-12">지원 접두사</h4>
+                    <div class="flex gap-12">
+                        <span class="badge badge-obsidian">play</span>
+                        <span class="badge badge-youtube">▶️</span>
+                        <span class="badge badge-black">▶</span>
+                        <span class="badge badge-outline">Play (대소문자 무관)</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div>
+                <h3 class="h4 mb-16">핵심 정규식</h3>
+                <div class="code-block">
+                    <span class="comment">// MM:SS 패턴</span><br>
+                    /<span class="string">^(\d{1,2}):(\d{2})$</span>/<br><br>
+                    <span class="comment">// 분해:</span><br>
+                    <span class="keyword">^</span> = 시작<br>
+                    <span class="function">(\d{1,2})</span> = 숫자 1~2개 (분)<br>
+                    <span class="keyword">:</span> = 콜론 그대로<br>
+                    <span class="function">(\d{2})</span> = 숫자 정확히 2개 (초)<br>
+                    <span class="keyword">$</span> = 끝
+                </div>
+                
+                <div class="code-block mt-16">
+                    <span class="comment">// 예시: "12:34"</span><br>
+                    match[<span class="number">1</span>] = <span class="string">"12"</span> <span class="comment">// 분</span><br>
+                    match[<span class="number">2</span>] = <span class="string">"34"</span> <span class="comment">// 초</span><br><br>
+                    <span class="comment">// 변환</span><br>
+                    <span class="number">12</span> × <span class="number">60</span> + <span class="number">34</span> = <span class="function">754</span>초
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="slide" data-next="메인 플러그인 통합">
+    <div class="slide-header">
+        <div>
+            <div class="slide-tag typescript">Module 2</div>
+            <h2 class="slide-title mt-12">YouTube 컨트롤러</h2>
+            <p class="slide-subtitle">youtubeController.ts - iframe 제어</p>
+        </div>
+    </div>
+    
+    <div class="slide-body">
+        <div class="grid grid-2 gap-32">
+            <div>
+                <h3 class="h4 mb-16">postMessage API</h3>
+                <div class="card-youtube mb-16">
+                    <p class="small"><strong>문제:</strong> iframe 안의 YouTube는 다른 도메인!</p>
+                    <p class="small text-gray mt-4">직접 접근 불가 (Cross-Origin Policy)</p>
+                </div>
+                
+                <div class="card-obsidian">
+                    <p class="small"><strong>해결:</strong> postMessage = 외교 채널</p>
+                    <p class="small text-gray mt-4">브라우저가 제공하는 안전한 통신 방법</p>
+                </div>
+                
+                <div class="code-block mt-24">
+                    <span class="comment">// YouTube에 명령 보내기</span><br>
+                    iframe.contentWindow.<span class="function">postMessage</span>(<br>
+                    &nbsp;&nbsp;JSON.<span class="function">stringify</span>({<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;event: <span class="string">'command'</span>,<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;func: <span class="string">'seekTo'</span>,<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;args: [<span class="number">83</span>, <span class="keyword">true</span>]<br>
+                    &nbsp;&nbsp;}), <span class="string">'*'</span><br>
+                    );
+                </div>
+            </div>
+            
+            <div>
+                <h3 class="h4 mb-16">필수 조건: enablejsapi</h3>
+                <div class="card mb-16" style="border-color: var(--danger);">
+                    <span class="badge badge-danger mb-8">중요!</span>
+                    <p class="small">YouTube가 명령을 듣게 하려면<br>URL에 <code>enablejsapi=1</code> 필요!</p>
+                </div>
+                
+                <div class="code-block">
+                    <span class="comment">// iframe URL 예시</span><br>
+                    https://youtube.com/embed/VIDEO_ID<span class="function">?enablejsapi=1</span>
+                </div>
+                
+                <div class="card mt-24" style="border-color: var(--success);">
+                    <span class="badge badge-success mb-8">자동 처리</span>
+                    <p class="small">플러그인이 자동으로 파라미터 추가!</p>
+                    <div class="code-block mt-12" style="font-size: 11px;">
+                        <span class="keyword">function</span> <span class="function">ensureJsApiEnabled</span>(iframe) {<br>
+                        &nbsp;&nbsp;url.searchParams.<span class="function">set</span>(<span class="string">'enablejsapi'</span>, <span class="string">'1'</span>);<br>
+                        }
+                    </div>
+                </div>
+                
+                <h4 class="h4 mt-24 mb-12">사용 가능한 명령</h4>
+                <div class="flex gap-8 flex-wrap">
+                    <span class="badge badge-black">seekTo</span>
+                    <span class="badge badge-black">playVideo</span>
+                    <span class="badge badge-black">pauseVideo</span>
+                    <span class="badge badge-outline">stopVideo</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="slide" data-next="ADHD 친화적 개발">
+    <div class="slide-header">
+        <div>
+            <div class="slide-tag obsidian">Integration</div>
+            <h2 class="slide-title mt-12">메인 플러그인 통합</h2>
+            <p class="slide-subtitle">main.ts - 핵심 3가지 포인트</p>
+        </div>
+    </div>
+    
+    <div class="slide-body">
+        <div class="grid grid-3 gap-24">
+            <div class="card" style="border-top: 4px solid var(--obsidian);">
+                <span class="badge badge-obsidian mb-16">Point 1</span>
+                <h3 class="h4">캡처 단계에서 잡기</h3>
+                <p class="small text-gray mt-8">버블링보다 먼저 이벤트를 잡아야 기본 동작을 막을 수 있음</p>
+                <div class="code-block mt-16" style="font-size: 11px;">
+                    <span class="keyword">this</span>.<span class="function">registerDomEvent</span>(<br>
+                    &nbsp;&nbsp;document,<br>
+                    &nbsp;&nbsp;<span class="string">'click'</span>,<br>
+                    &nbsp;&nbsp;handler,<br>
+                    &nbsp;&nbsp;<span class="function">true</span> <span class="comment">// ← 캡처!</span><br>
+                    );
+                </div>
+            </div>
+            
+            <div class="card" style="border-top: 4px solid var(--typescript);">
+                <span class="badge badge-typescript mb-16">Point 2</span>
+                <h3 class="h4">closest()로 링크 찾기</h3>
+                <p class="small text-gray mt-8">span 안을 클릭해도 부모 &lt;a&gt; 태그를 찾음</p>
+                <div class="code-block mt-16" style="font-size: 11px;">
+                    <span class="comment">// 클릭된 요소의 조상 중</span><br>
+                    <span class="comment">// 가장 가까운 &lt;a&gt; 찾기</span><br>
+                    <span class="keyword">const</span> link = target.<span class="function">closest</span>(<span class="string">'a'</span>);
+                </div>
+            </div>
+            
+            <div class="card" style="border-top: 4px solid var(--danger);">
+                <span class="badge badge-danger mb-16">Point 3</span>
+                <h3 class="h4">모든 전파 막기</h3>
+                <p class="small text-gray mt-8">다른 핸들러가 실행되지 않도록 완전 차단</p>
+                <div class="code-block mt-16" style="font-size: 11px;">
+                    evt.<span class="function">preventDefault</span>();<br>
+                    evt.<span class="function">stopPropagation</span>();<br>
+                    evt.<span class="function">stopImmediatePropagation</span>();
+                </div>
+            </div>
+        </div>
+        
+        <div class="card-dark mt-auto">
+            <h4 class="h4 mb-12" style="color: white;">문제 해결: "클릭하면 새 노트가 생성돼요"</h4>
+            <div class="grid grid-2 gap-24">
+                <div>
+                    <span class="badge badge-danger mb-8">❌ 이전 (실패)</span>
+                    <div class="code-block" style="font-size: 11px;">
+                        <span class="keyword">if</span> (!target.<span class="function">matches</span>(<span class="string">'a.internal-link'</span>)) <span class="keyword">return</span>;
+                    </div>
+                </div>
+                <div>
+                    <span class="badge badge-success mb-8">✓ 수정 (성공)</span>
+                    <div class="code-block" style="font-size: 11px;">
+                        <span class="keyword">const</span> link = target.<span class="function">closest</span>(<span class="string">'a'</span>);<br>
+                        <span class="keyword">if</span> (!link) <span class="keyword">return</span>;
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="slide" data-next="장단점 분석">
+    <div class="slide-header">
+        <div>
+            <div class="slide-tag" style="background: var(--warning); color: white;">ADHD</div>
+            <h2 class="slide-title mt-12">ADHD 친화적 개발 가이드</h2>
+            <p class="slide-subtitle">집중력 관리를 위한 단계별 태스크</p>
+        </div>
+    </div>
+    
+    <div class="slide-body">
+        <div class="grid grid-2 gap-32">
+            <div class="adhd-card">
+                <h3 class="h4 mb-16" style="color: var(--obsidian);">🎯 5단계 마이크로 태스크</h3>
+                
+                <div class="adhd-step">
+                    <div class="adhd-number">1</div>
+                    <div>
+                        <h4 style="font-weight: 600;">환경 설정</h4>
+                        <p class="small text-gray">폴더 생성 → npm init → 패키지 설치</p>
+                    </div>
+                    <div class="adhd-time">10분</div>
+                </div>
+                
+                <div class="adhd-step">
+                    <div class="adhd-number" style="background: var(--success);">2</div>
+                    <div>
+                        <h4 style="font-weight: 600;">타임스탬프 파서</h4>
+                        <p class="small text-gray">parseTimeString() 하나만 집중!</p>
+                    </div>
+                    <div class="adhd-time">15분</div>
+                </div>
+                
+                <div class="adhd-step">
+                    <div class="adhd-number" style="background: var(--typescript);">3</div>
+                    <div>
+                        <h4 style="font-weight: 600;">YouTube 컨트롤러</h4>
+                        <p class="small text-gray">iframe 찾기 → postMessage 테스트</p>
+                    </div>
+                    <div class="adhd-time">15분</div>
+                </div>
+                
+                <div class="adhd-step">
+                    <div class="adhd-number" style="background: var(--youtube);">4</div>
+                    <div>
+                        <h4 style="font-weight: 600;">메인 플러그인 연결</h4>
+                        <p class="small text-gray">onload()에서 이벤트 등록</p>
+                    </div>
+                    <div class="adhd-time">15분</div>
+                </div>
+                
+                <div class="adhd-step" style="background: var(--obsidian-light); border-color: var(--obsidian);">
+                    <div class="adhd-number" style="background: var(--obsidian);">5</div>
+                    <div>
+                        <h4 style="font-weight: 600;">테스트 & 배포</h4>
+                        <p class="small text-gray">빌드 → Obsidian 테스트 → GitHub 푸시</p>
+                    </div>
+                    <div class="adhd-time">5분</div>
+                </div>
+            </div>
+            
+            <div>
+                <div class="card mb-24">
+                    <h3 class="h4 mb-16">💡 집중 팁</h3>
+                    <ul style="list-style: none;">
+                        <li style="padding: 8px 0; display: flex; align-items: center; gap: 12px;">
+                            <span style="font-size: 20px;">🍅</span>
+                            <div>
+                                <strong>포모도로</strong>
+                                <p class="small text-gray">25분 집중 → 5분 휴식</p>
+                            </div>
+                        </li>
+                        <li style="padding: 8px 0; display: flex; align-items: center; gap: 12px;">
+                            <span style="font-size: 20px;">1️⃣</span>
+                            <div>
+                                <strong>한 번에 하나</strong>
+                                <p class="small text-gray">파서 → 컨트롤러 → 통합 순서로</p>
+                            </div>
+                        </li>
+                        <li style="padding: 8px 0; display: flex; align-items: center; gap: 12px;">
+                            <span style="font-size: 20px;">🏆</span>
+                            <div>
+                                <strong>작은 승리</strong>
+                                <p class="small text-gray">각 단계 완료 시 git commit!</p>
+                            </div>
+                        </li>
+                        <li style="padding: 8px 0; display: flex; align-items: center; gap: 12px;">
+                            <span style="font-size: 20px;">👀</span>
+                            <div>
+                                <strong>시각화</strong>
+                                <p class="small text-gray">console.log로 진행 확인</p>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+                
+                <div class="card-dark">
+                    <h4 style="color: var(--warning); margin-bottom: 12px;">⚠️ 막혔을 때</h4>
+                    <p class="small" style="color: var(--gray-300);">
+                        5분 이상 막히면 → 휴식 5분<br>
+                        그래도 안되면 → console.log 폭탄<br>
+                        그래도 안되면 → 다음 단계로 (나중에 다시)
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="slide" data-next="GitHub 배포">
+    <div class="slide-header">
+        <div>
+            <div class="slide-tag dark">Analysis</div>
+            <h2 class="slide-title mt-12">장단점 분석</h2>
+            <p class="slide-subtitle">솔직한 평가</p>
+        </div>
+    </div>
+    
+    <div class="slide-body">
+        <div class="grid grid-2 gap-32">
+            <div class="card" style="border-left: 4px solid var(--success);">
+                <h3 class="h4 mb-16" style="color: var(--success);">✅ 장점</h3>
+                <ul style="list-style: none;">
+                    <li style="padding: 10px 0; display: flex; align-items: flex-start; gap: 12px;">
+                        <span class="badge badge-success" style="flex-shrink: 0;">UX</span>
+                        <span>원클릭으로 즉시 점프 (우클릭 불필요)</span>
+                    </li>
+                    <li style="padding: 10px 0; display: flex; align-items: flex-start; gap: 12px;">
+                        <span class="badge badge-success" style="flex-shrink: 0;">직관</span>
+                        <span>직관적인 타임스탬프 형식 [play MM:SS]()</span>
+                    </li>
+                    <li style="padding: 10px 0; display: flex; align-items: flex-start; gap: 12px;">
+                        <span class="badge badge-success" style="flex-shrink: 0;">호환</span>
+                        <span>Reading View & Live Preview 모두 지원</span>
+                    </li>
+                    <li style="padding: 10px 0; display: flex; align-items: flex-start; gap: 12px;">
+                        <span class="badge badge-success" style="flex-shrink: 0;">자동</span>
+                        <span>enablejsapi 자동 추가</span>
+                    </li>
+                    <li style="padding: 10px 0; display: flex; align-items: flex-start; gap: 12px;">
+                        <span class="badge badge-success" style="flex-shrink: 0;">설정</span>
+                        <span>설정 옵션 (자동재생, 알림 on/off)</span>
+                    </li>
+                    <li style="padding: 10px 0; display: flex; align-items: flex-start; gap: 12px;">
+                        <span class="badge badge-success" style="flex-shrink: 0;">경량</span>
+                        <span>가벼운 코드 (~200줄)</span>
+                    </li>
+                </ul>
+            </div>
+            
+            <div class="card" style="border-left: 4px solid var(--warning);">
+                <h3 class="h4 mb-16" style="color: var(--warning);">⚠️ 단점 & 주의사항</h3>
+                <ul style="list-style: none;">
+                    <li style="padding: 10px 0; display: flex; align-items: flex-start; gap: 12px;">
+                        <span class="badge badge-warning" style="flex-shrink: 0;">토큰</span>
+                        <span>Claude로 개발 시 토큰 소모</span>
+                    </li>
+                    <li style="padding: 10px 0; display: flex; align-items: flex-start; gap: 12px;">
+                        <span class="badge badge-warning" style="flex-shrink: 0;">로딩</span>
+                        <span>iframe 로드 전 클릭 시 실패 가능</span>
+                    </li>
+                    <li style="padding: 10px 0; display: flex; align-items: flex-start; gap: 12px;">
+                        <span class="badge badge-warning" style="flex-shrink: 0;">다중</span>
+                        <span>여러 영상 시 첫 번째만 타겟</span>
+                    </li>
+                    <li style="padding: 10px 0; display: flex; align-items: flex-start; gap: 12px;">
+                        <span class="badge badge-warning" style="flex-shrink: 0;">필수</span>
+                        <span>enablejsapi 필수 (자동 추가됨)</span>
+                    </li>
+                    <li style="padding: 10px 0; display: flex; align-items: flex-start; gap: 12px;">
+                        <span class="badge badge-warning" style="flex-shrink: 0;">모바일</span>
+                        <span>모바일 테스트 필요</span>
+                    </li>
+                    <li style="padding: 10px 0; display: flex; align-items: flex-start; gap: 12px;">
+                        <span class="badge badge-warning" style="flex-shrink: 0;">정책</span>
+                        <span>YouTube 정책 변경 시 영향</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+        
+        <div class="quote mt-auto">"완벽한 도구는 없다. 문제를 알고 사용하는 것이 중요하다."</div>
+    </div>
+</div>
+
+<div class="slide" data-next="">
+    <div class="slide-header">
+        <div>
+            <div class="slide-tag dark">Deploy</div>
+            <h2 class="slide-title mt-12">GitHub 배포</h2>
+            <p class="slide-subtitle">릴리즈 및 BRAT 설치</p>
+        </div>
+    </div>
+    
+    <div class="slide-body">
+        <div class="grid grid-2 gap-32">
+            <div>
+                <h3 class="h4 mb-16">배포 명령어</h3>
+                <div class="code-block mb-16">
+                    <span class="comment"># 1. Git 초기화 및 커밋</span><br>
+                    git init<br>
+                    git add -A<br>
+                    git commit -m <span class="string">"feat: initial release"</span>
+                </div>
+                
+                <div class="code-block mb-16">
+                    <span class="comment"># 2. GitHub 레포 생성</span><br>
+                    gh repo create obsidian-youtube-oneclick \<br>
+                    &nbsp;&nbsp;--public --source . --push
+                </div>
+                
+                <div class="code-block mb-16">
+                    <span class="comment"># 3. 릴리즈 태그</span><br>
+                    git tag <span class="number">1.0.0</span><br>
+                    git push origin <span class="number">1.0.0</span>
+                </div>
+                
+                <div class="code-block">
+                    <span class="comment"># 4. GitHub Release 생성</span><br>
+                    gh release create <span class="number">1.0.0</span> \<br>
+                    &nbsp;&nbsp;main.js manifest.json styles.css
+                </div>
+            </div>
+            
+            <div>
+                <div class="card-obsidian mb-24">
+                    <h3 class="h4 mb-12">BRAT으로 설치</h3>
+                    <ol style="padding-left: 20px; color: var(--gray-700);">
+                        <li style="padding: 8px 0;">BRAT 플러그인 설치</li>
+                        <li style="padding: 8px 0;">Settings → BRAT → Add Beta Plugin</li>
+                        <li style="padding: 8px 0;"><code style="background: white; padding: 2px 8px; border-radius: 4px;">VoidLight00/obsidian-youtube-oneclick</code></li>
+                        <li style="padding: 8px 0;">플러그인 활성화</li>
+                    </ol>
+                </div>
+                
+                <div class="card">
+                    <h4 class="h4 mb-12">릴리즈에 포함되는 파일</h4>
+                    <div class="flex gap-8 flex-wrap">
+                        <span class="badge badge-black">main.js</span>
+                        <span class="badge badge-obsidian">manifest.json</span>
+                        <span class="badge badge-outline">styles.css</span>
+                    </div>
+                    <p class="small text-gray mt-12">node_modules, src/ 등은 포함 안함</p>
+                </div>
+                
+                <div class="card-dark mt-24">
+                    <h4 style="color: white; margin-bottom: 8px;">🔗 GitHub</h4>
+                    <p class="mono small" style="color: var(--gray-300);">github.com/VoidLight00/obsidian-youtube-oneclick</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="nav-dots" id="navDots"></div>
+
+<script>
+    const slides = document.querySelectorAll('.slide');
+    const progress = document.getElementById('progress');
+    const currentSlideEl = document.getElementById('currentSlide');
+    const nextTitle = document.getElementById('nextTitle');
+    const navDots = document.getElementById('navDots');
+    let currentSlide = 0;
+    const totalSlides = slides.length;
+
+    slides.forEach((_, i) => {
+        const dot = document.createElement('div');
+        dot.className = 'nav-dot' + (i === 0 ? ' active' : '');
+        dot.onclick = () => goToSlide(i);
+        navDots.appendChild(dot);
+    });
+
+    function updateSlide() {
+        slides.forEach((slide, i) => {
+            slide.classList.toggle('active', i === currentSlide);
+        });
+        
+        progress.style.width = ((currentSlide + 1) / totalSlides * 100) + '%';
+        currentSlideEl.textContent = String(currentSlide + 1).padStart(2, '0');
+        
+        const nextSlideData = slides[currentSlide]?.dataset.next;
+        nextTitle.textContent = nextSlideData || 'End';
+        
+        document.querySelectorAll('.nav-dot').forEach((dot, i) => {
+            dot.classList.toggle('active', i === currentSlide);
+        });
+    }
+
+    function goToSlide(index) {
+        currentSlide = Math.max(0, Math.min(index, totalSlides - 1));
+        updateSlide();
+    }
+
+    function nextSlide() {
+        if (currentSlide < totalSlides - 1) {
+            currentSlide++;
+            updateSlide();
+        }
+    }
+
+    function prevSlide() {
+        if (currentSlide > 0) {
+            currentSlide--;
+            updateSlide();
+        }
+    }
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'Enter') {
+            e.preventDefault();
+            nextSlide();
+        } else if (e.key === 'ArrowLeft') {
+            e.preventDefault();
+            prevSlide();
+        }
+    });
+
+    document.addEventListener('click', (e) => {
+        if (e.target.closest('.nav-dot') || e.target.closest('code') || e.target.closest('.code-block')) return;
+        
+        const rect = document.body.getBoundingClientRect();
+        if (e.clientX > rect.width / 2) {
+            nextSlide();
+        } else {
+            prevSlide();
+        }
+    });
+
+    updateSlide();
+</script>
+
+</body>
+</html>
