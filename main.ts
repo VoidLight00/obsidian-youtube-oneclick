@@ -57,15 +57,15 @@ export default class YouTubeOneClickPlugin extends Plugin {
 
   private handleClick(evt: MouseEvent) {
     const target = evt.target as HTMLElement;
-    
+
     const link = target.closest('a');
     if (!link) {
       return;
     }
 
     const linkText = link.textContent;
-    
-    if (!isTimestampLink(linkText)) {
+
+    if (!linkText || !isTimestampLink(linkText)) {
       return;
     }
 
@@ -75,8 +75,8 @@ export default class YouTubeOneClickPlugin extends Plugin {
     evt.stopPropagation();
     evt.stopImmediatePropagation();
 
-    const timestamp = extractTimestamp(linkText || '');
-    
+    const timestamp = extractTimestamp(linkText);
+
     if (!timestamp) {
       new Notice('Invalid timestamp format');
       return;
